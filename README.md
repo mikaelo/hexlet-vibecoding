@@ -4,7 +4,11 @@
 
 ## Калькулятор калорий и ИМТ
 
+[![Deploy to GitHub Pages](https://github.com/mikaelo/hexlet-vibecoding/actions/workflows/deploy.yml/badge.svg)](https://github.com/mikaelo/hexlet-vibecoding/actions/workflows/deploy.yml)
+
 Веб-приложение для расчёта индекса массы тела и суточной нормы калорий.
+
+🌐 **Открыть приложение:** https://mikaelo.github.io/hexlet-vibecoding/
 
 ### Возможности
 
