@@ -136,6 +136,16 @@
       line-height: 1.4;
     }
 
+    /* Верхняя часть карточки: название + подпись источника */
+    .card-top { display: flex; flex-direction: column; gap: 4px; }
+    .card-source {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+      opacity: 0.85;
+    }
+
     .skeleton {
       background: linear-gradient(90deg, #eef0f6 25%, #e3e6ef 37%, #eef0f6 63%);
       background-size: 400% 100%;
@@ -147,7 +157,42 @@
     }
     @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
 
-    footer { margin-top: 22px; font-size: 12px; color: var(--muted); text-align: center; line-height: 1.6; }
+    /* Состояние загрузки внутри карточки */
+    .card-loading {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-top: 12px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--muted);
+    }
+    .card-loading .spin {
+      width: 15px; height: 15px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex: none;
+    }
+
+    /* Короткая строка-примечание под карточками */
+    .source-note {
+      margin: 16px 0 0;
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .source-note .ext-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent-2);
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    footer { margin-top: 14px; font-size: 12px; color: var(--muted); text-align: center; line-height: 1.6; }
     footer a { color: var(--accent); text-decoration: none; }
 
     @media (max-width: 560px) {
@@ -173,34 +218,50 @@
     <div class="grid">
       <!-- USD -->
       <div class="card" id="card-usd">
-        <div class="card-label"><span class="dot cur"></span> Доллар США</div>
-        <div class="card-body"><div class="skeleton"></div></div>
+        <div class="card-top">
+          <div class="card-label"><span class="dot cur"></span> Доллар США</div>
+          <div class="card-source">курс ЦБ</div>
+        </div>
+        <div class="card-body"></div>
       </div>
 
       <!-- EUR -->
       <div class="card" id="card-eur">
-        <div class="card-label"><span class="dot cur"></span> Евро</div>
-        <div class="card-body"><div class="skeleton"></div></div>
+        <div class="card-top">
+          <div class="card-label"><span class="dot cur"></span> Евро</div>
+          <div class="card-source">курс ЦБ</div>
+        </div>
+        <div class="card-body"></div>
       </div>
 
       <!-- Температура -->
       <div class="card" id="card-temp">
-        <div class="card-label"><span class="dot weather"></span> Температура</div>
-        <div class="card-body"><div class="skeleton"></div></div>
+        <div class="card-top">
+          <div class="card-label"><span class="dot weather"></span> Температура</div>
+          <div class="card-source">погода Open-Meteo</div>
+        </div>
+        <div class="card-body"></div>
       </div>
 
       <!-- Осадки -->
       <div class="card" id="card-precip">
-        <div class="card-label"><span class="dot weather"></span> Осадки</div>
-        <div class="card-body"><div class="skeleton"></div></div>
+        <div class="card-top">
+          <div class="card-label"><span class="dot weather"></span> Осадки</div>
+          <div class="card-source">погода Open-Meteo</div>
+        </div>
+        <div class="card-body"></div>
       </div>
 
       <!-- Время обновления -->
       <div class="card updated" id="card-updated">
-        <div class="card-label">Обновлено</div>
-        <div class="card-body"><div class="skeleton"></div></div>
+        <div class="card-top">
+          <div class="card-label">Обновлено</div>
+        </div>
+        <div class="card-body"></div>
       </div>
     </div>
+
+    <p class="source-note"><span class="ext-dot"></span>Данные получены из внешних API</p>
 
     <footer>
       Курсы валют — <a href="https://www.cbr-xml-daily.ru/daily_json.js" target="_blank" rel="noopener">cbr-xml-daily.ru</a>,
@@ -347,10 +408,16 @@
       }
     }
 
-    function showSkeletons() {
+    // Явное состояние загрузки внутри карточки: спиннер + подпись
+    function loadingHtml(text = "Загрузка…") {
+      return `<div class="card-loading"><span class="spin"></span>${text}</div>`;
+    }
+
+    function showLoading() {
       ["card-usd", "card-eur", "card-temp", "card-precip"].forEach((id) =>
-        setCard(id, `<div class="skeleton"></div>`)
+        setCard(id, loadingHtml())
       );
+      setCard("card-updated", loadingHtml("Обновляем данные…"));
     }
 
     function updateTimestamp(anyOk) {
@@ -370,8 +437,7 @@
       btn.classList.add("loading");
       btn.disabled = true;
       btn.querySelector(".btn-text").textContent = "Обновляем…";
-      showSkeletons();
-      setCard("card-updated", `<div class="skeleton" style="width:45%"></div>`);
+      showLoading();
 
       // Оба запроса независимы: падение одного не мешает другому
       const [curOk, weatherOk] = await Promise.all([loadCurrency(), loadWeather()]);
