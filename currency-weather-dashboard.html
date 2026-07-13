@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Курс валют и погода в Москве</title>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --text: #1f2430;
+      --muted: #6b7280;
+      --border: #e6e8f0;
+      --accent: #4f46e5;      /* индиго — валюты */
+      --accent-2: #f59e0b;    /* янтарный — погода */
+      --danger-bg: #fef2f2;
+      --danger-border: #fecaca;
+      --danger-text: #b91c1c;
+      --shadow: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      padding: 24px 16px 48px;
+    }
+
+    .wrap { max-width: 880px; margin: 0 auto; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 22px;
+      line-height: 1.25;
+      margin: 0;
+      font-weight: 700;
+    }
+    .subtitle { color: var(--muted); font-size: 14px; margin-top: 4px; }
+
+    .refresh-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.05s ease;
+      box-shadow: var(--shadow);
+    }
+    .refresh-btn:hover { background: #4338ca; }
+    .refresh-btn:active { transform: translateY(1px); }
+    .refresh-btn:disabled { opacity: 0.6; cursor: default; }
+    .refresh-btn .spinner {
+      width: 15px; height: 15px;
+      border: 2px solid rgba(255,255,255,0.45);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    .refresh-btn.loading .spinner { display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px 20px;
+      box-shadow: var(--shadow);
+      min-height: 118px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .card-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+    .dot.cur { background: var(--accent); }
+    .dot.weather { background: var(--accent-2); }
+
+    .value {
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin-top: 10px;
+    }
+    .value .unit { font-size: 17px; font-weight: 600; color: var(--muted); margin-left: 4px; }
+
+    .meta { font-size: 13px; color: var(--muted); margin-top: 6px; }
+    .change.up { color: #059669; }
+    .change.down { color: #dc2626; }
+
+    .card.updated { grid-column: 1 / -1; align-items: flex-start; }
+    .card.updated .value { font-size: 20px; }
+
+    .card-error {
+      font-size: 14px;
+      color: var(--danger-text);
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-top: 10px;
+      line-height: 1.4;
+    }
+
+    .skeleton {
+      background: linear-gradient(90deg, #eef0f6 25%, #e3e6ef 37%, #eef0f6 63%);
+      background-size: 400% 100%;
+      animation: shimmer 1.4s ease infinite;
+      border-radius: 8px;
+      height: 30px;
+      width: 60%;
+      margin-top: 10px;
+    }
+    @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+    footer { margin-top: 22px; font-size: 12px; color: var(--muted); text-align: center; line-height: 1.6; }
+    footer a { color: var(--accent); text-decoration: none; }
+
+    @media (max-width: 560px) {
+      .grid { grid-template-columns: 1fr; }
+      h1 { font-size: 19px; }
+      .value { font-size: 26px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Курс валют и погода в Москве</h1>
+        <div class="subtitle">Данные ЦБ РФ и Open-Meteo</div>
+      </div>
+      <button id="refresh" class="refresh-btn">
+        <span class="spinner"></span>
+        <span class="btn-text">Обновить</span>
+      </button>
+    </header>
+
+    <div class="grid">
+      <!-- USD -->
+      <div class="card" id="card-usd">
+        <div class="card-label"><span class="dot cur"></span> Доллар США</div>
+        <div class="card-body"><div class="skeleton"></div></div>
+      </div>
+
+      <!-- EUR -->
+      <div class="card" id="card-eur">
+        <div class="card-label"><span class="dot cur"></span> Евро</div>
+        <div class="card-body"><div class="skeleton"></div></div>
+      </div>
+
+      <!-- Температура -->
+      <div class="card" id="card-temp">
+        <div class="card-label"><span class="dot weather"></span> Температура</div>
+        <div class="card-body"><div class="skeleton"></div></div>
+      </div>
+
+      <!-- Осадки -->
+      <div class="card" id="card-precip">
+        <div class="card-label"><span class="dot weather"></span> Осадки</div>
+        <div class="card-body"><div class="skeleton"></div></div>
+      </div>
+
+      <!-- Время обновления -->
+      <div class="card updated" id="card-updated">
+        <div class="card-label">Обновлено</div>
+        <div class="card-body"><div class="skeleton"></div></div>
+      </div>
+    </div>
+
+    <footer>
+      Курсы валют — <a href="https://www.cbr-xml-daily.ru/daily_json.js" target="_blank" rel="noopener">cbr-xml-daily.ru</a>,
+      погода — <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a>.<br />
+      Откройте файл в браузере, чтобы данные загрузились вживую.
+    </footer>
+  </div>
+
+  <script>
+    const CBR_URL = "https://www.cbr-xml-daily.ru/daily_json.js";
+    const WEATHER_URL =
+      "https://api.open-meteo.com/v1/forecast" +
+      "?latitude=55.7558&longitude=37.6173" +
+      "&current=temperature_2m,precipitation,weather_code" +
+      "&timezone=Europe%2FMoscow";
+
+    const btn = document.getElementById("refresh");
+
+    const nf = new Intl.NumberFormat("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // Показывает содержимое одной карточки
+    function setCard(id, html) {
+      document.querySelector(`#${id} .card-body`).innerHTML = html;
+    }
+
+    // Понятное сообщение об ошибке в конкретной карточке
+    function setCardError(id, text) {
+      setCard(id, `<div class="card-error">⚠️ ${text}</div>`);
+    }
+
+    // Одна валютная карточка: значение + изменение относительно прошлого дня
+    function renderCurrency(id, valute, symbol) {
+      if (!valute || typeof valute.Value !== "number") {
+        setCardError(id, "Нет данных по этой валюте.");
+        return;
+      }
+      const value = valute.Value / (valute.Nominal || 1);
+      const prev = valute.Previous / (valute.Nominal || 1);
+      let changeHtml = "";
+      if (typeof valute.Previous === "number") {
+        const diff = value - prev;
+        const cls = diff >= 0 ? "up" : "down";
+        const arrow = diff >= 0 ? "▲" : "▼";
+        changeHtml = `<div class="meta change ${cls}">${arrow} ${nf.format(Math.abs(diff))} ₽ за сутки</div>`;
+      }
+      setCard(id,
+        `<div class="value">${nf.format(value)}<span class="unit">₽</span></div>${changeHtml}`
+      );
+    }
+
+    async function loadCurrency() {
+      try {
+        const res = await fetch(CBR_URL, { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        const v = data.Valute || {};
+        renderCurrency("card-usd", v.USD, "USD");
+        renderCurrency("card-eur", v.EUR, "EUR");
+        return true;
+      } catch (e) {
+        const msg = "Не удалось загрузить курс валют (ЦБ РФ). Проверьте интернет и нажмите «Обновить».";
+        setCardError("card-usd", msg);
+        setCardError("card-eur", msg);
+        return false;
+      }
+    }
+
+    function precipText(mm) {
+      if (mm === 0) return "Без осадков";
+      return `${nf.format(mm)} мм`;
+    }
+
+    async function loadWeather() {
+      try {
+        const res = await fetch(WEATHER_URL, { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        const cur = data.current;
+        if (!cur) throw new Error("no current");
+
+        const t = cur.temperature_2m;
+        const tRounded = Math.round(t);
+        const sign = tRounded > 0 ? "+" : "";
+        setCard("card-temp",
+          `<div class="value">${sign}${tRounded}<span class="unit">°C</span></div>` +
+          `<div class="meta">ощущается сейчас</div>`
+        );
+
+        const p = cur.precipitation;
+        setCard("card-precip",
+          `<div class="value">${precipText(p)}</div>` +
+          `<div class="meta">${p === 0 ? "сухо" : "за последний час"}</div>`
+        );
+        return true;
+      } catch (e) {
+        const msg = "Не удалось загрузить погоду (Open-Meteo). Проверьте интернет и нажмите «Обновить».";
+        setCardError("card-temp", msg);
+        setCardError("card-precip", msg);
+        return false;
+      }
+    }
+
+    function showSkeletons() {
+      ["card-usd", "card-eur", "card-temp", "card-precip"].forEach((id) =>
+        setCard(id, `<div class="skeleton"></div>`)
+      );
+    }
+
+    function updateTimestamp(anyOk) {
+      const now = new Date();
+      const time = now.toLocaleString("ru-RU", {
+        day: "numeric", month: "long",
+        hour: "2-digit", minute: "2-digit", second: "2-digit",
+      });
+      if (anyOk) {
+        setCard("card-updated", `<div class="value">${time}</div>`);
+      } else {
+        setCardError("card-updated", "Данные не загружены. Последняя попытка: " + time);
+      }
+    }
+
+    async function refresh() {
+      btn.classList.add("loading");
+      btn.disabled = true;
+      btn.querySelector(".btn-text").textContent = "Обновляем…";
+      showSkeletons();
+      setCard("card-updated", `<div class="skeleton" style="width:45%"></div>`);
+
+      // Оба запроса независимы: падение одного не мешает другому
+      const [curOk, weatherOk] = await Promise.all([loadCurrency(), loadWeather()]);
+      updateTimestamp(curOk || weatherOk);
+
+      btn.classList.remove("loading");
+      btn.disabled = false;
+      btn.querySelector(".btn-text").textContent = "Обновить";
+    }
+
+    btn.addEventListener("click", refresh);
+    refresh();
+  </script>
+</body>
+</html>
